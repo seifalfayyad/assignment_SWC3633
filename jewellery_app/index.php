@@ -6,13 +6,11 @@ $gold_price_usd = 0.00;
 $myr_exchange_rate = 0.00;
 $api_errors = [];
 
-// Database Connection
 $conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
 if ($conn->connect_error) {
     die("Database connection failed: " . $conn->connect_error);
 }
 
-// Fetch order records using JOIN
 $sql = "SELECT Orders.order_id, Customers.customer_name, GoldProducts.product_name, 
                GoldProducts.weight_g, GoldProducts.purity, Orders.quantity, Orders.order_date 
         FROM Orders
@@ -24,8 +22,7 @@ if ($result) {
         $db_orders[] = $row;
     }
 }
-
-// Fetch API 1: MetalpriceAPI 
+ 
 $gold_url = "https://api.metalpriceapi.com/v1/latest?api_key=" . urlencode(METALPRICE_API_KEY) . "&base=USD&currencies=XAU";
 $gold_ch = curl_init();
 curl_setopt($gold_ch, CURLOPT_URL, $gold_url);
@@ -37,8 +34,6 @@ if (curl_errno($gold_ch) || !$gold_res) {
     $api_errors[] = "Failed to fetch gold price from MetalpriceAPI.";
 } else {
     $gold_data = json_decode($gold_res, true);
-    // MetalpriceAPI usually provides currency value relative to base (e.g. 1 USD = X XAU)
-    // To get USD per Troy Ounce, we calculate 1 / XAU rate value
     if (isset($gold_data['rates']['XAU'])) {
         $gold_price_usd = 1 / $gold_data['rates']['XAU'];
     } else {
@@ -47,7 +42,6 @@ if (curl_errno($gold_ch) || !$gold_res) {
 }
 curl_close($gold_ch);
 
-//  AbstractAPI (USD to MYR Exchange Rate)
 $ex_url = "https://exchange-rates.abstractapi.com/v1/live/?api_key=" . urlencode(ABSTRACT_API_KEY) . "&base=USD&target=MYR";
 $ex_ch = curl_init();
 curl_setopt($ex_ch, CURLOPT_URL, $ex_url);
@@ -67,7 +61,6 @@ if (curl_errno($ex_ch) || !$ex_res) {
 }
 curl_close($ex_ch);
 
-// Calculate standard Pure Gold Price per gram in MYR
 $pure_gold_price_myr = 0.00;
 if ($gold_price_usd > 0 && $myr_exchange_rate > 0) {
     $pure_gold_price_myr = ($gold_price_usd * $myr_exchange_rate) / 31.1035;
@@ -91,7 +84,6 @@ if ($gold_price_usd > 0 && $myr_exchange_rate > 0) {
 
     <h1>Gold Jewellery Customer Orders</h1>
 
-    <!-- Basic Error Handling Notification Summary -->
     <?php if (!empty($api_errors)): ?>
         <div class="error-box">
             <strong>System Alert:</strong>
@@ -103,14 +95,12 @@ if ($gold_price_usd > 0 && $myr_exchange_rate > 0) {
         </div>
     <?php endif; ?>
 
-    <!-- Context Metadata and API Sourcing Context -->
     <div class="meta-info">
         <p><strong>API 1 (MetalpriceAPI):</strong> Latest available gold spot price: <strong>$<?php echo number_format($gold_price_usd, 2); ?> USD</strong> / troy ounce</p>
         <p><strong>API 2 (AbstractAPI):</strong> Latest available USD-to-MYR exchange rate: <strong>RM <?php echo number_format($myr_exchange_rate, 4); ?></strong></p>
         <p><strong>Calculated Value Basis:</strong> Pure Gold Price: RM <?php echo number_format($pure_gold_price_myr, 2); ?> / gram</p>
     </div>
 
-    <!-- Main Output Grid Component -->
     <table>
         <thead>
             <tr>
@@ -128,7 +118,7 @@ if ($gold_price_usd > 0 && $myr_exchange_rate > 0) {
         <tbody>
             <?php if (!empty($db_orders)): ?>
                 <?php foreach ($db_orders as $order): 
-                    // Perform specific row calculations matching formulas
+                    
                     $total_weight = $order['weight_g'] * $order['quantity'];
                     $purity_factor = $order['purity'] / 1000;
                     $estimated_value = $pure_gold_price_myr * $total_weight * $purity_factor;
